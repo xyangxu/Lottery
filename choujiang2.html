@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>小高老师课堂幸运抽奖</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin: 20px 0 10px;
+      color: #333;
+      text-align: center;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(10, 80px);
+      gap: 10px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .card {
+      width: 80px;
+      height: 100px;
+      perspective: 600px;
+      position: relative;
+    }
+
+    .card-number {
+      position: absolute;
+      top: 6px;
+      right: 8px;
+      font-size: 16px;
+      font-weight: bold;
+      color: #000;
+      z-index: 2;
+    }
+
+    .card > .front,
+    .card > .back {
+      width: 100%;
+      height: 100%;
+      border-radius: 10px;
+      position: absolute;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+      transition: transform 0.6s;
+      box-shadow: 0 0 5px rgba(0,0,0,0.3);
+    }
+
+    .card .front {
+      background-color: #fff;
+      transform: rotateY(180deg);
+    }
+
+    .card .back {
+      background-color: #2196F3;
+      color: white;
+    }
+
+    .card.flipped .back {
+      transform: rotateY(180deg);
+    }
+
+    .card.flipped .front {
+      transform: rotateY(0);
+    }
+
+    .buttons {
+      margin-top: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .buttons button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      min-width: 130px;
+      transition: background-color 0.3s ease;
+    }
+
+    .draw-btn { background-color: #f44336; color: white; }
+    .draw-btn:hover { background-color: #d32f2f; }
+
+    .reset-btn, .setup-btn {
+      background-color: #2196F3; color: white;
+    }
+    .reset-btn:hover, .setup-btn:hover {
+      background-color: #1976d2;
+    }
+
+    .reveal-btn {
+      background-color: #4caf50;
+      color: white;
+    }
+    .reveal-btn:hover {
+      background-color: #388e3c;
+    }
+
+    .music-control {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .flash {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, #ffffff 0%, #ffffcc 30%, #ffd700 80%, #ffaa00 100%);
+      opacity: 0;
+      z-index: 9999;
+      animation: flashEffect 3s ease;
+      pointer-events: none;
+    }
+
+    @keyframes flashEffect {
+      0% { opacity: 0; }
+      15% { opacity: 1; }
+      40% { opacity: 0.8; }
+      70% { opacity: 0.4; }
+      100% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🎁 小高老师课堂幸运抽奖系统 🎁</h1>
+
+  <div class="grid" id="cardContainer"></div>
+
+  <div class="buttons">
+    <button class="draw-btn" onclick="drawRandomCard()">抽一个</button>
+    <button class="reveal-btn" onclick="revealAll()">🎉 一键揭晓</button>
+    <button class="reset-btn" onclick="resetLottery()">重置奖池</button>
+    <button class="setup-btn" onclick="setupLottery()">设置奖项数量</button>
+  </div>
+
+  <button id="bgmBtn" class="music-control">▶ 开启背景音乐</button>
+
+  <!-- 音效 -->
+  <audio id="dingSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_6848724902.mp3?filename=correct-2-46134.mp3"></audio>
+  <audio id="legendBgm" src="https://cdn.pixabay.com/download/audio/2022/10/01/audio_4a287cfcea.mp3?filename=victory-epic-117611.mp3"></audio>
+  <audio id="pageBgm" src="1.MP3" loop></audio>
+
+  <script>
+    let defaultPrizes = { first: 2, second: 8, third: 30 };
+    let prizes = { ...defaultPrizes };
+    let prizeList = [];
+    let allCards = [];
+
+    function shuffle(array) {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function generatePrizeList() {
+      prizeList = [];
+      for (let i = 0; i < prizes.first; i++) prizeList.push("一等奖");
+      for (let i = 0; i < prizes.second; i++) prizeList.push("二等奖");
+      for (let i = 0; i < prizes.third; i++) prizeList.push("三等奖");
+      shuffle(prizeList);
+    }
+
+    function renderCards() {
+      const container = document.getElementById("cardContainer");
+      container.innerHTML = "";
+      allCards = [];
+      let id = 1;
+
+      for (let i = 0; i < prizeList.length; i++) {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.dataset.index = i;
+
+        const front = document.createElement("div");
+        front.className = "front";
+        front.textContent = prizeList[i];
+
+        const back = document.createElement("div");
+        back.className = "back";
+        back.textContent = "点击抽奖";
+
+        const number = document.createElement("div");
+        number.className = "card-number";
+        number.textContent = id++;
+
+        card.appendChild(number);
+        card.appendChild(front);
+        card.appendChild(back);
+        container.appendChild(card);
+        allCards.push(card);
+
+        card.addEventListener("click", () => {
+          if (!card.classList.contains("flipped") && !card.classList.contains("revealed")) {
+            card.classList.add("flipped");
+            const dingSound = document.getElementById("dingSound");
+            dingSound.currentTime = 0;
+            dingSound.play();
+
+            const prize = prizeList[parseInt(card.dataset.index)];
+            if (prize === "一等奖") {
+              const legendBgm = document.getElementById("legendBgm");
+              legendBgm.currentTime = 0;
+              legendBgm.play();
+              triggerFlash();
+            }
+          }
+        });
+      }
+    }
+
+    function drawRandomCard() {
+      const unflipped = allCards.filter(card => !card.classList.contains("flipped"));
+      if (unflipped.length === 0) {
+        alert("所有奖项已揭晓！");
+        return;
+      }
+      const randomCard = unflipped[Math.floor(Math.random() * unflipped.length)];
+      randomCard.click();
+    }
+
+    function resetLottery() {
+      prizes = { ...defaultPrizes };
+      generatePrizeList();
+      renderCards();
+    }
+
+    function setupLottery() {
+      const first = parseInt(prompt("请输入一等奖数量：", prizes.first)) || 0;
+      const second = parseInt(prompt("请输入二等奖数量：", prizes.second)) || 0;
+      const third = parseInt(prompt("请输入三等奖数量：", prizes.third)) || 0;
+
+      prizes.first = first;
+      prizes.second = second;
+      prizes.third = third;
+
+      defaultPrizes = { ...prizes };
+      resetLottery();
+    }
+
+    function revealAll() {
+      allCards.forEach((card) => {
+        if (!card.classList.contains("flipped")) {
+          card.classList.add("flipped", "revealed");
+          const prize = prizeList[parseInt(card.dataset.index)];
+          if (prize === "一等奖") {
+            triggerFlash();
+            const legendBgm = document.getElementById("legendBgm");
+            legendBgm.currentTime = 0;
+            legendBgm.play();
+          }
+        }
+      });
+    }
+
+    function triggerFlash() {
+      const flash = document.createElement("div");
+      flash.className = "flash";
+      document.body.appendChild(flash);
+      setTimeout(() => {
+        document.body.removeChild(flash);
+      }, 3000);
+    }
+
+    const bgm = document.getElementById("pageBgm");
+    const bgmBtn = document.getElementById("bgmBtn");
+
+    bgmBtn.addEventListener("click", () => {
+      if (bgm.paused) {
+        bgm.play().then(() => {
+          bgmBtn.textContent = "⏸ 关闭背景音乐";
+        }).catch(() => {
+          alert("浏览器阻止了自动播放，请允许播放或刷新后点击按钮");
+        });
+      } else {
+        bgm.pause();
+        bgmBtn.textContent = "▶ 开启背景音乐";
+      }
+    });
+
+    // 初始化
+    generatePrizeList();
+    renderCards();
+  </script>
+</body>
+</html>
